@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping Cart</title>
+    <style>
+        /* Basit stil ayarları */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+        }
+        .cart-item {
+            margin-bottom: 15px;
+        }
+        .cart-total {
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+    <script>
+        function calculateTotal() {
+            let total = 0;
+            document.querySelectorAll('.cart-item').forEach(function(item) {
+                const price = parseFloat(item.dataset.price);
+                const quantity = parseInt(item.querySelector('.quantity').value);
+                if (quantity > 0) {
+                    total += price * quantity;
+                }
+            });
+            document.querySelector('.cart-total').textContent = 'Total: ' + total.toFixed(2) + ' ' + document.querySelector('.cart-item').dataset.currency;
+            return total; // Toplam değerini döndür
+        }
+
+        async function createOrder(event) {
+            event.preventDefault();  // Formun varsayılan gönderimini engelle
+
+            const orderItems = [];  // Sipariş öğelerini saklamak için bir dizi
+            let totalValue = 0; // Toplam değeri başlat
+
+            document.querySelectorAll('.cart-item').forEach(function(item) {
+                const productId = item.dataset.productId;  // Ürün ID'sini al
+                const quantity = parseInt(item.querySelector('.quantity').value);
+                const price = parseFloat(item.dataset.price);
+                if (quantity > 0) { // Sadece 0'dan büyük olanları ekle
+                    orderItems.push({ id: productId, quantity: quantity });  // ID ve miktarı ekle
+                    totalValue += price * quantity; // Toplam değeri güncelle
+                }
+            });
+
+            const selectedAddress = document.querySelector('input[name="address_id"]:checked');
+            const addressId = selectedAddress ? selectedAddress.value : null;
+
+            const response = await fetch('/api/order_create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'  // CSRF token'ını ekle
+                },
+                body: JSON.stringify({
+                    items: orderItems,
+                    address_id: addressId,
+                    total_value: totalValue // Toplam değeri burada gönder
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                prepareCheckoutData(data.order_id);  // order_id'yi hazırla
+                alert("Order created with ID: " + data.order_id);
+                window.location.href = `/cart/payment?order_id=${data.order_id}`;  // Sipariş ID'si ile ödeme sayfasına yönlendir
+            } else {
+                // Hata durumunu yönet
+                const errorData = await response.json();
+                alert("Error creating order: " + errorData.error);
+                console.error('Error creating order:', errorData);
+            }
+        }
+
+        function prepareCheckoutData(orderId) {
+            // Sipariş ID'sini gizli alana yaz
+            document.getElementById('checkoutData').value = orderId;
+        }
+    </script>
+</head>
+<body onload="calculateTotal()">
+
+<div class="cart-container">
+    <h1>Your Shopping Cart</h1>
+
+    {% if product_data %}
+        <form method="POST" onsubmit="createOrder(event);">  <!-- event ile formun varsayılan gönderimini engelle -->
+            {% csrf_token %}
+            <div class="cart-items">
+                {% for product in product_data %}
+                    <div class="cart-item" data-price="{{ product.total_price }}" data-product-id="{{ product.id }}" data-currency="{{ product.currency_symbol }}">
+                        <span>{{ product.name }} (</span>
+                        <input type="number" class="quantity" value="{{ product.quantity }}" min="0" onchange="calculateTotal()">
+                        <span> pcs)</span>
+                        <span> - {{ product.total_price }} {{ product.currency_symbol }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Toplam Fiyat -->
+            <div class="cart-total"></div>
+
+            <!-- Sipariş ID'si için gizli alan -->
+            <input type="hidden" id="checkoutData" name="checkout_data">
+
+            <!-- Ödeme Sayfasına Yönlendirme -->
+            <div class="checkout-button">
+                <button type="submit" class="checkout-link">Proceed to Payment</button>
+            </div>
+        </form>
+    {% else %}
+        <p>Your cart is empty.</p>
+    {% endif %}
+
+    <div class="address-selection">
+        <h3>Select an Address</h3>
+        {% if request.user.userprofile.address_set.exists %}
+            <div>
+                {% for address in request.user.userprofile.address_set.all %}
+                    <input type="radio" id="address_{{ address.id }}" name="address_id" value="{{ address.id }}">
+                    <label for="address_{{ address.id }}">{{ address }}</label><br>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>You must select an address to proceed with payment.</p>
+        {% endif %}
+    </div>
+</div>
+
+</body>
+</html>

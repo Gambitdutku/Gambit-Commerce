@@ -1,0 +1,144 @@
+<div class="payment-page">
+    <h2>Checkout Page</h2>
+    {% if product_data %}
+        <form method="POST" action="{% url 'process_payment' %}">
+            {% csrf_token %}
+            <div class="cart-items">
+                {% for product in product_data %}
+                    <div class="cart-item" data-price="{{ product.total_price }}" data-currency="{{ product.currency_symbol }}">
+                        <span>{{ product.name }} (</span>
+                        <input type="number" class="quantity" value="{{ product.quantity }}" min="1" onchange="calculateTotal()">
+                        <span> pcs)</span>
+                        <span> - {{ product.total_price }} {{ product.currency_symbol }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Toplam Fiyat -->
+            <div class="cart-total"></div>
+
+            <!-- Gizli alan için sipariş ID'sini gönder -->
+            <input type="hidden" id="checkoutData" name="checkout_data">
+
+            <!-- Ödeme Yöntemleri -->
+            <div class="payment-options">
+                <h3>Payment Methods</h3>
+                <div id="paymentOptionsContainer">
+                    {% for option in payment_options %}
+                        <div>
+                            <input type="radio" id="payment_{{ option.id }}" name="payment_option" value="{{ option.redirect_url }}" data-parameters="{{ option.parameters|json_script:'params' }}">
+                            <label for="payment_{{ option.id }}">{{ option.name }}</label>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Ödeme butonu -->
+            <div class="checkout-button">
+                <button type="button" class="checkout-link" onclick="prepareCheckoutData(event)">Complete Payment</button>
+            </div>
+        </form>
+    {% else %}
+        <p>Your cart is empty.</p>
+    {% endif %}
+</div>
+
+<!-- Modal Yapısı -->
+<div id="paymentModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <div id="modal-body">
+            <!-- Buraya AJAX ile içerik yüklenecek -->
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Modal Stil Ayarları */
+    .modal {
+        display: none; /* Başlangıçta gizli */
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgb(0,0,0); /* Siyah arka plan */
+        background-color: rgba(0,0,0,0.4); /* Yarı şeffaf arka plan */
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: 15% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+    }
+
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+
+    .close-button:hover,
+    .close-button:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+function calculateTotal() {
+    let total = 0;
+    $('.cart-item').each(function() {
+        const price = parseFloat($(this).data('price'));
+        const quantity = parseInt($(this).find('.quantity').val());
+        total += price * quantity;
+    });
+    $('.cart-total').text('Total: ' + total.toFixed(2) + ' ' + $('.cart-item').data('currency'));
+}
+
+function prepareCheckoutData(event) {
+    event.preventDefault(); // Formun varsayılan gönderimini engelle
+
+    const selectedPaymentOption = $('input[name="payment_option"]:checked');
+
+    if (selectedPaymentOption.length) {
+        const redirectUrl = selectedPaymentOption.val(); // Seçili ödeme seçeneğinin URL'si
+
+        // AJAX isteği gönder
+        $.ajax({
+            url: redirectUrl, // Ödeme URL'si
+            method: 'GET',
+            success: function(data) {
+                // Modal içeriğini güncelle
+                $('#modal-body').html(data);
+                $('#paymentModal').css('display', 'block'); // Modali göster
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading payment page:', error);
+                alert('Could not load payment page. Please try again.');
+            }
+        });
+    } else {
+        alert("Please select a payment option.");
+    }
+}
+
+// Modal kapatma butonuna tıklayınca modalı kapat
+$('.close-button').click(function() {
+    $('#paymentModal').css('display', 'none');
+});
+
+// Modal dışında bir yere tıklanırsa modalı kapat
+$(window).click(function(event) {
+    if ($(event.target).is('#paymentModal')) {
+        $('#paymentModal').css('display', 'none');
+    }
+});
+</script>

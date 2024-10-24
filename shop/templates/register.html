@@ -1,0 +1,17 @@
+<!-- register.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Kayıt Ol</title>
+</head>
+<body>
+    <h2>Kayıt Ol</h2>
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Kaydol</button>
+    </form>
+    <a href="{% url 'login' %}">Zaten üye misin? Giriş yap!</a>
+</body>
+</html>

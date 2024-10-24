@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <!-- jQuery kütüphanesini ekliyoruz -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h2>User Profile</h2>
+
+    <!-- Kullanıcı profilini güncellemek için form -->
+    <form method="POST">
+        {% csrf_token %}
+        {{ profile_form.as_p }}  <!-- Profil formu, Django form sistemi kullanılarak burada görüntüleniyor -->
+        <button type="submit">Update Profile</button>  <!-- Profil güncelleme butonu -->
+    </form>
+
+    <h3>Add Address</h3>
+    <!-- Kullanıcı adresi eklemek için form -->
+    <form method="POST" id="address-form">
+        {% csrf_token %} <!-- CSRF koruma için token ekliyoruz -->
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required placeholder="Name">
+
+        <label for="city-select">City:</label>
+        <select id="city-select" name="city" required>
+            <option value="">Select City</option>
+            <!-- Şehirler burada yüklenecek -->
+        </select>
+
+        <label for="district-select">District:</label>
+        <select id="district-select" name="district" disabled required>
+            <option value="">Select District</option>
+        </select>
+
+        <label for="area-select">Area:</label>
+        <select id="area-select" name="area" disabled required>
+            <option value="">Select Area</option>
+        </select>
+
+        <label for="neighborhood-select">Neighborhood:</label>
+        <select id="neighborhood-select" name="neighborhood" disabled required>
+            <option value="">Select Neighborhood</option>
+        </select>
+
+        <label for="address">Address:</label>
+        <input type="text" id="address" name="address" required placeholder="Enter your address here">
+
+        <button type="submit">Add Address</button> <!-- Adres ekleme butonu -->
+    </form>
+
+    <h3>Your Addresses</h3>
+    <ul id="address-list">
+        {% for address in addresses %}
+            <li> {{ address.name }} {{ address.neighborhood.name }}, {{ address.district.name }}, {{ address.city.name }}: {{ address.address }}</li>
+        {% empty %}
+            <li>No addresses found.</li> <!-- Adres bulunmadığında görüntüle -->
+        {% endfor %}
+    </ul>
+
+    <script>
+        // CSRF token ayarları: AJAX istekleri için gerekli
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                // Eğer URL bir HTTP veya HTTPS URL'si değilse, CSRF token'ı ekle
+                if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+                    xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                }
+            }
+        });
+
+        // Belirli bir cookie'nin değerini almak için fonksiyon
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // İlgili cookie'yi bul
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue; // Cookie değerini döndür
+        }
+
+        $(document).ready(function() {
+            // Şehirleri yüklemek için AJAX isteği
+            $.ajax({
+                url: 'http://127.0.0.1:8000/api/cities/?format=json', // Şehirler API'si
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    if (data && Array.isArray(data)) {
+                        data.forEach(function(city) {
+                            $('#city-select').append(new Option(city.name, city.id));
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading cities:', error);
+                }
+            });
+
+            // Şehir değiştiğinde ilçeleri yükle
+            $('#city-select').change(function() {
+                let cityId = $(this).val();
+                $('#district-select').prop('disabled', !cityId).empty().append(new Option("Select District", ""));
+                $('#area-select').prop('disabled', true).empty().append(new Option("Select Area", ""));
+                $('#neighborhood-select').prop('disabled', true).empty().append(new Option("Select Neighborhood", ""));
+
+                if (cityId) {
+                    $.ajax({
+                        url: `http://127.0.0.1:8000/api/cities/${cityId}/districts/?format=json`, // İlçeler API'si
+                        type: 'GET',
+                        dataType: 'json',
+                        success: function(data) {
+                            if (data && Array.isArray(data)) {
+                                data.forEach(function(district) {
+                                    $('#district-select').append(new Option(district.name, district.id));
+                                });
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading districts:', error);
+                        }
+                    });
+                }
+            });
+
+            // İlçe değiştiğinde alanları yükle
+            $('#district-select').change(function() {
+                let districtId = $(this).val();
+                $('#area-select').prop('disabled', !districtId).empty().append(new Option("Select Area", ""));
+                $('#neighborhood-select').prop('disabled', true).empty().append(new Option("Select Neighborhood", ""));
+
+                if (districtId) {
+                    $.ajax({
+                        url: `http://127.0.0.1:8000/api/districts/${districtId}/areas/?format=json`, // Alanlar API'si
+                        type: 'GET',
+                        dataType: 'json',
+                        success: function(data) {
+                            if (data && Array.isArray(data)) {
+                                data.forEach(function(area) {
+                                    $('#area-select').append(new Option(area.name, area.id));
+                                });
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading areas:', error);
+                        }
+                    });
+                }
+            });
+
+            // Alan değiştiğinde mahalleleri yükle
+            $('#area-select').change(function() {
+                let areaId = $(this).val();
+                $('#neighborhood-select').prop('disabled', !areaId).empty().append(new Option("Select Neighborhood", ""));
+
+                if (areaId) {
+                    $.ajax({
+                        url: `http://127.0.0.1:8000/api/areas/${areaId}/neighborhoods/?format=json`, // Mahalleler API'si
+                        type: 'GET',
+                        dataType: 'json',
+                        success: function(data) {
+                            if (data && Array.isArray(data)) {
+                                data.forEach(function(neighborhood) {
+                                    $('#neighborhood-select').append(new Option(neighborhood.name, neighborhood.id));
+                                });
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading neighborhoods:', error);
+                        }
+                    });
+                }
+            });
+
+            // Adres formu gönderildiğinde
+            $('#address-form').submit(function(event) {
+                event.preventDefault(); // Varsayılan form gönderimini engelle
+
+                const addressData = {
+                    name: $('#name').val(),
+                    city: $('#city-select').val(),
+                    district: $('#district-select').val(),
+                    area: $('#area-select').val(),
+                    neighborhood: $('#neighborhood-select').val(),
+                    address: $('#address').val()
+                };
+
+                $.ajax({
+                    url: 'http://127.0.0.1:8000/api/addresses/', // Adres ekleme API'si
+                    type: 'POST',
+                    data: JSON.stringify(addressData),
+                    contentType: 'application/json',
+                    beforeSend: function(xhr) {
+                        const csrftoken = getCookie('csrftoken');
+                        xhr.setRequestHeader('X-CSRFToken', csrftoken);
+                    },
+                    success: function(response) {
+                        $('#address-list').append(`<li>${$('#neighborhood-select option:selected').text()}, ${$('#district-select option:selected').text()}, ${$('#city-select option:selected').text()}: ${$('#address').val()}</li>`);
+                        $('#address-form')[0].reset();
+                        $('#neighborhood-select, #area-select, #district-select').prop('disabled', true);
+                    },
+                    error: function(xhr) {
+                        const errors = xhr.responseJSON;
+                        alert('Failed to add address: ' + errors);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

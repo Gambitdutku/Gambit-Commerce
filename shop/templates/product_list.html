@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        img {
+            max-width: 100px;
+            height: auto;
+        }
+        form {
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Product List</h1>
+    <ul>
+        {% for product in products %}
+            <li>
+                <h2>{{ product.name }}</h2>
+                <p>{{ product.description }}</p>
+                <h3>Prices:</h3>
+                <ul>
+                    {% for price in product.productprice_set.all %}
+                        <li>
+                            {{ price.price }} {{ price.currency.symbol }} ({{ price.payment_method.name }})
+                            <!-- Sepete ekle formu -->
+                            <form method="POST" action="{% url 'add_to_cart' product.id price.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <input type="hidden" name="price_id" value="{{ price.id }}">
+                                <input type="number" name="quantity" value="1" min="1" style="width: 50px;">
+                                <button type="submit">Sepete Ekle</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <img src="{{ product.image.url }}" alt="{{ product.name }}">
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
